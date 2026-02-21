@@ -1,31 +1,22 @@
-name: CI workflows (cl)
+deploy:
+  runs-on: self-hosted
+  needs: docker   # dépend du job CI
+  steps:
+    - name: Login Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-env:
-  IMAGE_NAME: testcicd
-  IMAGE_TAG: 1.1.0
-  DOCKER_HUB_REGISTRY: hadjimansour
+    - name: Pull la dernière image
+      run: docker pull hadjimansour/testcicd:1.1.0
 
-on:
-  workflow_dispatch:
+    - name: Stopper et supprimer l'ancien conteneur
+      run: |
+        if [ $(docker ps -aq -f name=testcicd_container) ]; then
+          docker stop testcicd_container
+          docker rm testcicd_container
+        fi
 
-jobs:
-  docker:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Login Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build Docker image
-        run: docker build -t $DOCKER_HUB_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
-
-      - name: Test Docker image
-        run: docker image ls $DOCKER_HUB_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
-
-      - name: Push Docker image
-        run: docker push $DOCKER_HUB_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+    - name: Lancer le nouveau conteneur
+      run: docker run -d --name testcicd_container -p 80:80 hadjimansour/testcicd:1.1.0
